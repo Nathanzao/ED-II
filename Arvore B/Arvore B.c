@@ -77,43 +77,43 @@ void split(NoArvB *pai, int pos, NoArvB *y){ /* Y = nó que será dividido. Pai 
     int mediana = y->chave[meio]; /* Valor que será inserido no nó pai. */
     y->n = meio; /* Atualizando a quantidade de elementos do nó com os valores da esquerda. */
 
-    for (int j = pai->n; j >= pos + 1; j--) { /* Vamos começar do fim dos ponteiros dos filhos e ir voltando até achar o ponteiro dianteiro da posição original de y. */
+    for (int j = pai->n; j >= pos + 1; j--) { /* Vamos começar do fim dos ponteiros dos filhos e ir voltando até achar o ponteiro dianteiro da posição original de y. Isso para encaixar z. */
         pai->filho[j + 1] = pai->filho[j]; /* Enquanto fazemos a parte de cima, jogamos os ponteiros do pai para direita, abrindo o espaço para botar o novo Z. */
     }
     pai->filho[pos + 1] = z;
 
-    for (int j = pai->n - 1; j >= pos; j--) { /* Faz a mesma coisa, só que para as chaves. */
+    for (int j = pai->n - 1; j >= pos; j--) { /* Faz a mesma coisa, só que para as chaves. Por isso o n - 1.*/
         pai->chave[j + 1] = pai->chave[j];
     }
     pai->chave[pos] = mediana;
     pai->n++;
 
+
+    /* Note um detalhe: o pai nunca está cheio, por isso os dois FOR acima nunca estarão pegando aquele caso de MAX inválido.
+    Ele não está cheio porque se tivesse, já teria justamente sofrido esse split. */
 }
 
 void insereRecursivo(NoArvB *x, int k, NoArvB **novaRaiz){
     int i = x->n - 1; /* Pegando último elemento. */
 
     if(x->folha == 1){
-        while(i >= 0 && k < x->chave[i]){
+        while(i >= 0 && k < x->chave[i]){ /* Caso seja o último, irá cair na posição MAX. Logo, temporariamente irá ocupar uma posição inválida, mas logo após vem o split. */
             x->chave[i + 1] = x->chave[i];
             i--;
         }
-        x->chave[i + 1] = k; /* i + 1 aqui pois irá parar justamente na anterior ao espaço vazio. */
+        x->chave[i + 1] = k; 
         x->n++;
-    }else{
-        while(i >= 0 && k < x->chave[i]){
+    }else{ /* Caso tenha filhos. */
+        while(i >= 0 && k < x->chave[i]){ /* Encontra o filho que queremos descer. */
             i--;
         }
 
-        insereRecursivo(x->filho[++i], k, novaRaiz);
+        insereRecursivo(x->filho[++i], k, novaRaiz); /* ++i, pois sempre irá parar entre um intervalo. */
 
         if(x->filho[i]->n >= MAX){
             split(x, i, x->filho[i]); /* Se o filho está cheio, divida-o. */
         }
     }
-
-
-
 }
 
 NoArvB* insereArvoreB(NoArvB *raiz, int k) { /* Fazemos efetivamente a inserção nessa função. A outra é só uma parte. */
@@ -208,7 +208,7 @@ void merge(NoArvB *atual, int pos){
         filho->chave[j + T] = posterior->chave[j];
     }
 
-    if(!filho->folha){ /* Se não for folha, copia os filhos. Obs: todos os filhos estão no mesmo nível. Se um for folha, outros também são. */
+    if(!filho->folha){ /* Se não for folha, copia os filhos. Obs: todos os filhos estão no mesmo nível. Se um for folha, outros também são = logo o posterior também não é folha. */
         for(int i = 0; i <= posterior->n; i++){
             filho->filho[i + T] = posterior->filho[i];
         }
@@ -217,13 +217,13 @@ void merge(NoArvB *atual, int pos){
     for (int i = pos + 1; i < atual->n; i++) {/* Move para esquerda as chaves do pai para tapar o buraco que ficou (3) */
         atual->chave[i - 1] = atual->chave[i];
     }
-    for (int i = pos + 2; i <= atual->n; i++) { /* Move os filhos. */
+    for (int i = pos + 2; i <= atual->n; i++) { /* Move os filhos. É dois porque o filho[pos + 1] deixou de existir.s*/
         atual->filho[i - 1] = atual->filho[i];
     }
 
     atual->n--;
 
-    filho->n += posterior->n + 1;
+    filho->n += posterior->n + 1; /* Somamos a quantidade de valores do filho com o irmão posterior, mais o 1 do nó pai que desceu. */
 
     free(posterior);
 }
@@ -244,22 +244,21 @@ void corrigirFilho(NoArvB *atual, int pos){
     NoArvB *anterior = NULL;
     NoArvB *posterior = NULL;
 
-    if(pos > 0 ){
+    if(pos > 0 ){ /* Verificando se POS ocupa a primeira posição. Se for, NULL.*/
         anterior  = atual->filho[pos - 1];
     }
     
-    if(pos < atual->n){
+    if(pos < atual->n){ /* Verificando se POS é o último. Se for, NULL. */
         posterior = atual->filho[pos + 1];
     }
     
 
     NoArvB *filho = atual->filho[pos];
-    if (filho == NULL) return; /* segurança */
 
-    if ( anterior != NULL && anterior->n >= T) { /* irmão esquerdo pode emprestar */
+    if (anterior != NULL && anterior->n >= T) { /* irmão esquerdo pode emprestar */
         
-        for (int j = filho->n - 1; j >= 0; j--) { /* Abrindo espaço na primeira posição. */
-            filho->chave[j + 1] = filho->chave[j];
+        for (int j = filho->n - 1; j >= 0; j--) { /* Abrindo espaço na primeira posição do filho, para inserir o valor do pai em sua primeira posição. */
+            filho->chave[j + 1] = filho->chave[j]; /* Veja que usando o corrigir filho justamente porque ele tem menos que o mínimo. Então N nunca está cheio. */
         }
         if (!filho->folha) { /* Vamos deslocar os filhos também. */
             for (int j = filho->n; j >= 0; j--) {
@@ -269,7 +268,7 @@ void corrigirFilho(NoArvB *atual, int pos){
 
         filho->chave[0] = atual->chave[pos - 1]; /* Chave do pai desce ao filho. */
         if(!filho->folha){
-            filho->filho[0] = anterior->filho[anterior->n]; /* Ver no Gemini a ilustração se tiver dúvida. */
+            filho->filho[0] = anterior->filho[anterior->n]; /* O filho da posição 0 do filho irá receber os filhos do maior valor de seu irmão a esquerda.*/
         }
 
         atual->chave[pos - 1] = anterior->chave[anterior->n - 1]; /* Maior filho da esquerda sobe ao pai. */
@@ -300,9 +299,9 @@ void corrigirFilho(NoArvB *atual, int pos){
     }
     else { /* nenhum pode emprestar -> merge */
         if (pos < atual->n) {
-            merge(atual, pos);
+            merge(atual, pos); /* Merge com o irmão a direita. */
         } else {
-            merge(atual, pos - 1);
+            merge(atual, pos - 1); /* Merge com o irmão da esquerda. */
         }
     }
 }
@@ -332,21 +331,20 @@ ArvoreB *remover(NoArvB *no, int k){
             i++;
         }
 
-        if (i <= atual->n && k == atual->chave[i - 1]) {
+        if (i <= atual->n && k == atual->chave[i - 1]) { /* Encontramos o valor nesse nó. */
             pos = i - 1;
             break;
         }
 
         pos = i - 1;
 
-        if (atual->filho[i - 1] == NULL) return; /* Seguranca */
 
-        if(atual->folha == 1){ 
+        if(atual->folha == 1){ /* Não achamos e é folha. */
             break;
         }
 
-        if(atual->filho[i - 1]->n < T){
-            corrigirFilho(atual, i - 1);
+        if(atual->filho[pos]->n < T){
+            corrigirFilho(atual, pos);
         }
 
         pai = atual;
@@ -354,26 +352,30 @@ ArvoreB *remover(NoArvB *no, int k){
 
     }
 
-    if(atual == NULL) return; /* segurança */
 
     /* Vamos começar a tratar os casos agora. Verificar o predecessor e sucessor. */
 
+    if(atual == NULL || (atual->folha && (pos >= atual->n || atual->chave[pos] != k))){ /* Caso não achamos na árvore. */
+        printf("%d nao encontrada na arvore.\n", k);
+        return no;
+    }
+
     if(atual->folha == 1){
-        // Caso 1: chave em folha -> só remove deslocando
+        // Caso 1: chave em folha -> só remove deslocando para esquerda, sobrescrevendo em cima da chave.
         for (int j = pos; j < atual->n - 1; j++) {
             atual->chave[j] = atual->chave[j + 1];
         }
         atual->n--;
 
-    }else{
+    }else{ /* Caso não seja folha. */
         NoArvB *anterior = NULL;
         NoArvB *posterior = NULL;
 
-        if(pos >= 0){
+        if(pos >= 0){ /* Verificando se o irmão esquerdo existe. */
             anterior = atual->filho[pos];
         }
 
-        if(pos + 1 <= atual->n){
+        if(pos + 1 <= atual->n){ /* Verificando se o irmão direito existe. */
             posterior = atual->filho[pos + 1];
         }
 
@@ -387,18 +389,22 @@ ArvoreB *remover(NoArvB *no, int k){
                 atual->chave[pos] = valor;
                 remover(posterior, valor);
                     }else{ /* Fazer o Merge pq não dá pra tirar nada de nenhum dos dois. */
-                        if (pos < atual->n) {
-                        merge(atual, pos);
-                        if (atual->filho[pos] != NULL){
-                            atual->filho[pos] = remover(atual->filho[pos], k);
-                        }
-                        return;
-                    } else {
-                        merge(atual, pos - 1);
-                        if (atual->filho[pos - 1] != NULL){
-                            atual->filho[pos] = remover(atual->filho[pos], k);
-                        }
-                        return; 
+                        if (pos < atual->n) { /* Caso o pos não seja o último, fundimos com o irmão da direita. */
+                            merge(atual, pos);
+
+                            if (atual->filho[pos] != NULL){ /* Verificamos se a árvore ficou vazia e removemos a raiz original. */
+                                atual->filho[pos] = remover(atual->filho[pos], k);
+                            }
+
+                            return;
+                    } else { /* Se for o último, será com o da esquerda. */
+                            merge(atual, pos - 1);
+                            
+                            if (atual->filho[pos - 1] != NULL){
+                                atual->filho[pos] = remover(atual->filho[pos], k);
+                            }
+
+                            return; 
                         }
                     }
         }
@@ -447,7 +453,7 @@ int main(){
 
     // Removendo raiz
     printf("\nRemovendo 10 (raiz)\n");
-    raiz = remover(raiz,10);
+    raiz = remover(raiz,10); /* Caso de remover a raiz precisamos retorná-la. */
     imprimirArvore(raiz,0);
 
 
